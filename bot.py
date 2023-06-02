@@ -1,18 +1,24 @@
-import discord
-from discord.ext import commands
+import disnake
+from disnake.ext import commands
+from disnake.ui import View, Button
+from dotenv import load_dotenv
+import os
 
-intents = discord.Intents.default()
+load_dotenv()
+
+# Intents are required to get the member object when a button is clicked
+intents = disnake.Intents.all()
 intents.members = True
 
-bot = commands.Bot(command_prefix='/', intents=intents)
+bot = commands.Bot(command_prefix='#', intents=intents)
 
 # Dictionary to store the options and queues
 voting_options = {
-    'option1': [],
-    'option2': [],
-    'option3': [],
-    'option4': [],
-    'option5': []
+    'TOP': [],
+    'MID': [],
+    'SUP': [],
+    'ADC': [],
+    'JUNGLE': []
 }
 
 @bot.event
@@ -31,50 +37,49 @@ async def setup(ctx):
         await ctx.send("I don't have the permissions to manage channels.")
         return
 
-    # Create the voting message
-    voting_message = await ctx.send("Vote for an option:\n"
-                                    "1. Option 1\n"
-                                    "2. Option 2\n"
-                                    "3. Option 3\n"
-                                    "4. Option 4\n"
-                                    "5. Option 5")
+    # Create the voting message with buttons
+    view = View()
+    view.add_item(Button( label="TOP", custom_id="TOP"))
+    view.add_item(Button( label="MID", custom_id="MID"))
+    view.add_item(Button( label="SUP", custom_id="SUP"))
+    view.add_item(Button( label="ADC", custom_id="ADC"))
+    view.add_item(Button( label="JUNGLE", custom_id="JUNGLE"))
 
-    # Add reactions to the voting message
-    await voting_message.add_reaction("1️⃣")
-    await voting_message.add_reaction("2️⃣")
-    await voting_message.add_reaction("3️⃣")
-    await voting_message.add_reaction("4️⃣")
-    await voting_message.add_reaction("5️⃣")
+    voting_message = await ctx.send("Vote for an option:", view=view)
+
+    # Store the message ID for later reference
+    global voting_message_id
+    voting_message_id = voting_message.id
 
 @bot.event
-async def on_raw_reaction_add(payload):
-    # Check if the reaction is added to the voting message
-    if payload.message_id == YOUR_VOTING_MESSAGE_ID:
-        guild = bot.get_guild(payload.guild_id)
-        member = guild.get_member(payload.user_id)
-        channel = guild.get_channel(YOUR_TEXT_CHANNEL_ID)
+async def on_button_click(inter):
+    # Check if the button is clicked on the voting message
+    if inter.message.id == voting_message_id:
+        guild = inter.guild
+        member = guild.get_member(inter.user.id)
+        channel = guild.get_channel(1114156750598328413)
 
         # Check if the user is in the guild and the channel exists
         if member and channel:
-            # Check if the reaction corresponds to an option
-            if str(payload.emoji) == "1️⃣":
-                voting_options['option1'].append(member)
-            elif str(payload.emoji) == "2️⃣":
-                voting_options['option2'].append(member)
-            elif str(payload.emoji) == "3️⃣":
-                voting_options['option3'].append(member)
-            elif str(payload.emoji) == "4️⃣":
-                voting_options['option4'].append(member)
-            elif str(payload.emoji) == "5️⃣":
-                voting_options['option5'].append(member)
+            # Check if the button label corresponds to an option
+            option = inter.component.custom_id
+            if option in voting_options and member not in voting_options[option]:
+                voting_options[option].append(member)
 
-            # Check if each option has been chosen at least twice
-            if all(len(queue) >= 2 for queue in voting_options.values()):
-                # Dequeue each option twice and create new text channels
-                for option, queue in voting_options.items():
-                    for _ in range(2):
-                        member = queue.pop(0)
-                        new_channel = await guild.create_text_channel(f"{option}-{member.name}")
-                        await new_channel.send(f"Welcome {member.mention} to the {option} channel!")
+                # Check if each option has been chosen at least twice
+                if len(voting_options['TOP']) >= 2:
+                    new_channel = await guild.create_text_channel(
+                        name="Game1",
+                        overwrites={
+                            guild.default_role: disnake.PermissionOverwrite(read_messages=False),
+                        }
+                    )
+                    # Dequeue each option twice and create new text channels
+                    for option, queue in voting_options.items():
+                        for _ in range(2):
+                            if queue:
+                                member = queue.pop(0)
+                                await new_channel.set_permissions(member, read_messages=True)
+                                await new_channel.send(f"Welcome {member.mention} to the Game1 channel!")
 
-bot.run('YOUR_BOT_TOKEN')
+bot.run(os.getenv('TOKEN'))
