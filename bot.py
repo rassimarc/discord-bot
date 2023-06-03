@@ -1,10 +1,14 @@
 import disnake
 from disnake.ext import commands
 from disnake.ui import View, Button
+from disnake import ui
 from dotenv import load_dotenv
 import os
+import sqlite3
+
 
 load_dotenv()
+
 
 # Intents are required to get the member object when a button is clicked
 intents = disnake.Intents.all()
@@ -44,6 +48,7 @@ async def setup(ctx):
     view.add_item(Button( label="SUP", custom_id="SUP"))
     view.add_item(Button( label="ADC", custom_id="ADC"))
     view.add_item(Button( label="JUNGLE", custom_id="JUNGLE"))
+    view.add_item(Button(style = disnake.ButtonStyle.red , label = "Leave" , custom_id = "leave"))
 
     voting_message = await ctx.send("Vote for an option:", view=view)
 
@@ -53,7 +58,7 @@ async def setup(ctx):
 
 @bot.event
 async def on_button_click(inter):
-    # Check if the button is clicked on the voting message
+    
     if inter.message.id == voting_message_id:
         guild = inter.guild
         member = guild.get_member(inter.user.id)
@@ -63,7 +68,15 @@ async def on_button_click(inter):
         if member and channel:
             # Check if the button label corresponds to an option
             option = inter.component.custom_id
+            if option == 'leave':
+                for options, queue in voting_options.items():
+                    if member in queue:
+                        queue.remove(member)
+
             if option in voting_options and member not in voting_options[option]:
+                for options, queue in voting_options.items():
+                    if member in queue:
+                        queue.remove(member)
                 voting_options[option].append(member)
 
                 # Check if each option has been chosen at least twice
